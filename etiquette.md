@@ -19,6 +19,20 @@
 ##  **`#include <numeric>`**     
   - **`#std::accumulate`** - sum up all the values
     - int sum  = std::accumulate(data.begin(), data.end(), 0);
+## lambda function
+  - [] {} syntax
+    - [] - Captures nothing. Only has access to arguments passed directly to it
+    - [x] - Captures variable x by value (read-only copy)
+    - [&x] - Captures variable x by reference (can modify the original variable)
+    - [=] - Default capture: captures all used local variables by value
+    - [&] - Default capture: captures all used local variables by reference
+    - [=, &x] - Captures everything by value, but x by reference.
+    - {} - Define the lambda function scope
+##  **`#include <atomic>`**     
+  - **`#std::atomic<T>`** - create a template class of type T
+    - Provide protection to maintain a consistent count for multi-threading (remove overlapping)
+    - Limit access to only one thread have access over a variable at any given time (slow down program a bit)
+
 
 # Class & Struct
 ## Definition
@@ -159,3 +173,58 @@ private:
 - Bottom-up tabulation: fill a table from the base cases upward. No recursion.
   -  No recursion needed and no memory function overhead
   -  Shrink the memory of the table by keeping only part of the table you need
+ 
+# CMake
+- Create two types of cmakelist.txt (1 for top-level for standardizing all low-level cmake to follow and 1 for low-level for cpp)
+- Create a build directory in your project and **`cd build`** 
+- Then run **`cmake ../.`** to create the make files in the build directory
+- Then run **`cmake --build . -j`** to create the executables
+
+# Threads
+## **`#include <thread>`** 
+- **`std::thread`** - creates a thread class of a function
+- **`T.join()`**  - have the cpp pauses until the thread is finished
+- thread creation is slow (takes ms)
+- When a thread is done, it goes into an idle state
+## Etiquette
+- **`pool.emplace_back(greet, i, "…")`** constructs a `std::thread` in place that will call
+  `greet(i, "…")`. The `i` is copied; had `greet` needed to *modify* a caller variable, you would pass
+  `std::ref(var)`.
+- **`t.join()`** waits for thread `t` to finish. We join every thread in the pool before `main`
+  returns.
+- **The must-join rule** is RAII wearing a stricter face: forget to join (or detach) and the
+  `std::thread` destructor calls `std::terminate()`. The cleanest habit is to always join, often from a
+  wrapper whose destructor joins for you; **C++20**'s `std::jthread` does exactly that automatically,
+  but this course targets C++17, so we join by hand.
+## Hazard: data races
+- Threads become dangerous the moment two of them touch the **same** data and at least one is writing.
+- Safeguard
+  - A **`std::mutex`** (mutual exclusion) protects a **critical section** — a region only one thread may execute at a time. You do not lock and unlock it by hand; you use a **`std::lock_guard`**, whose constructor locks and whose destructor unlocks. That is RAII from Lecture 2 again: the lock is released automatically when the guard leaves scope, even if an exception is thrown.
+  - A **`std::atomic<T>`** makes operations on a single variable **indivisible** at the hardware level, with no lock at all. For a lone counter, `++atomicCounter` is one uninterruptible read-modify-write — exactly what the race was missing.
+
+    // --- Fix 1: a mutex makes the increment a critical section (one thread at a time). ---
+    long guarded = 0;
+    std::mutex m;
+    auto work_mutex = [&] {
+        for (int i = 0; i < kPerThread; ++i) {
+            std::lock_guard<std::mutex> lock(m);   // locks here; unlocks at end of this scope (RAII)
+            ++guarded;
+        }
+    };
+
+    // --- Fix 2: an atomic does the read-modify-write indivisibly, no lock needed. ---
+    std::atomic<long> atomicCounter{0};
+    auto work_atomic = [&] {
+        for (int i = 0; i < kPerThread; ++i)
+            ++atomicCounter;                       // one uninterruptible hardware increment
+    };
+
+    // Small helper: launch kThreads copies of fn and join them all.
+    auto run = [&](auto fn) {
+        std::vector<std::thread> pool;
+        for (int t = 0; t < kThreads; ++t) pool.emplace_back(fn);
+        for (auto& t : pool) t.join();
+    };
+
+    run(work_mutex);
+    run(work_atomic);
