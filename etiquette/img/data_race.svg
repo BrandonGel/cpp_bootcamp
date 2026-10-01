@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 376" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13">
+  <rect width="780" height="376" rx="12" fill="#ffffff"/>
+  <text x="24" y="34" font-size="18" font-weight="600" fill="#0f172a">Why <tspan font-family="Consolas, monospace">++counter</tspan> loses updates — and how a lock fixes it</text>
+  <text x="24" y="56" fill="#475569" font-size="12">++counter is three steps: READ the value, ADD 1, WRITE it back. Time flows left → right.</text>
+
+  <!-- Race -->
+  <text x="24" y="92" font-weight="600" fill="#dc2626">Data race</text>
+  <text x="24" y="122" fill="#0f172a">Thread A</text>
+  <text x="24" y="162" fill="#0f172a">Thread B</text>
+  <g font-size="12" text-anchor="middle">
+    <rect x="110" y="104" width="100" height="28" rx="5" fill="#dbeafe" stroke="#2563eb"/><text x="160" y="123">read 5</text>
+    <rect x="270" y="104" width="100" height="28" rx="5" fill="#dbeafe" stroke="#2563eb"/><text x="320" y="123">add → 6</text>
+    <rect x="430" y="104" width="100" height="28" rx="5" fill="#dbeafe" stroke="#2563eb"/><text x="480" y="123">write 6</text>
+    <rect x="160" y="144" width="100" height="28" rx="5" fill="#ffedd5" stroke="#ea580c"/><text x="210" y="163">read 5</text>
+    <rect x="320" y="144" width="100" height="28" rx="5" fill="#ffedd5" stroke="#ea580c"/><text x="370" y="163">add → 6</text>
+    <rect x="480" y="144" width="100" height="28" rx="5" fill="#ffedd5" stroke="#ea580c"/><text x="530" y="163">write 6</text>
+  </g>
+  <text x="600" y="128" fill="#dc2626" font-weight="600">counter = 6</text>
+  <text x="600" y="146" fill="#dc2626" font-size="12">two increments,</text>
+  <text x="600" y="162" fill="#dc2626" font-size="12">one is lost (expected 7)</text>
+
+  <line x1="24" y1="196" x2="756" y2="196" stroke="#e2e8f0"/>
+
+  <!-- Mutex -->
+  <text x="24" y="228" font-weight="600" fill="#16a34a">With std::mutex / lock_guard</text>
+  <text x="24" y="258" fill="#0f172a">Thread A</text>
+  <text x="24" y="298" fill="#0f172a">Thread B</text>
+  <rect x="104" y="238" width="250" height="40" rx="6" fill="none" stroke="#16a34a" stroke-dasharray="5 3"/>
+  <rect x="390" y="278" width="260" height="40" rx="6" fill="none" stroke="#16a34a" stroke-dasharray="5 3"/>
+  <g font-size="12" text-anchor="middle">
+    <rect x="110" y="244" width="76" height="28" rx="5" fill="#dbeafe" stroke="#2563eb"/><text x="148" y="263">read 5</text>
+    <rect x="192" y="244" width="76" height="28" rx="5" fill="#dbeafe" stroke="#2563eb"/><text x="230" y="263">add → 6</text>
+    <rect x="274" y="244" width="76" height="28" rx="5" fill="#dbeafe" stroke="#2563eb"/><text x="312" y="263">write 6</text>
+    <rect x="130" y="284" width="250" height="28" rx="5" fill="#f1f5f9" stroke="#94a3b8" stroke-dasharray="3 3"/><text x="255" y="303" fill="#64748b">blocked waiting for the lock</text>
+    <rect x="396" y="284" width="76" height="28" rx="5" fill="#ffedd5" stroke="#ea580c"/><text x="434" y="303">read 6</text>
+    <rect x="478" y="284" width="76" height="28" rx="5" fill="#ffedd5" stroke="#ea580c"/><text x="516" y="303">add → 7</text>
+    <rect x="560" y="284" width="84" height="28" rx="5" fill="#ffedd5" stroke="#ea580c"/><text x="602" y="303">write 7</text>
+  </g>
+  <text x="664" y="303" fill="#16a34a" font-weight="600">counter = 7 ✓</text>
+  <text x="24" y="342" fill="#475569" font-size="12">Dashed green box = critical section: only one thread is inside at a time.</text>
+  <text x="24" y="360" fill="#475569" font-size="12">std::atomic gives the same result for a single variable, as one indivisible hardware operation (no lock object).</text>
+</svg>

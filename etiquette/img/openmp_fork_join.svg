@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 280" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13">
+  <defs>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2563eb"/>
+    </marker>
+  </defs>
+  <rect width="780" height="280" rx="12" fill="#ffffff"/>
+  <text x="24" y="34" font-size="18" font-weight="600" fill="#0f172a">OpenMP fork–join model</text>
+
+  <!-- master line -->
+  <g stroke="#2563eb" stroke-width="3" fill="none">
+    <path d="M30,150 L150,150"/>
+    <path d="M150,150 L340,150"/>
+    <path d="M150,150 C175,150 175,90 200,90 L300,90 C320,90 320,150 340,150"/>
+    <path d="M150,150 C175,150 175,120 200,120 L280,120 C310,120 310,150 340,150"/>
+    <path d="M150,150 C175,150 175,180 200,180 L320,180 C330,180 330,150 340,150"/>
+    <path d="M340,150 L440,150"/>
+    <path d="M440,150 L640,150"/>
+    <path d="M440,150 C465,150 465,95 490,95 L600,95 C620,95 620,150 640,150"/>
+    <path d="M440,150 C465,150 465,205 490,205 L590,205 C615,205 615,150 640,150"/>
+    <path d="M640,150 L740,150" marker-end="url(#ar)"/>
+  </g>
+  <g fill="#0f172a">
+    <rect x="337" y="78" width="6" height="112" fill="#dc2626"/>
+    <rect x="637" y="83" width="6" height="132" fill="#dc2626"/>
+  </g>
+  <g font-size="12" fill="#475569" text-anchor="middle">
+    <text x="90" y="140">serial</text>
+    <text x="150" y="216">fork</text>
+    <text x="245" y="72" font-weight="600" fill="#0f172a">#pragma omp parallel</text>
+    <text x="245" y="212">team of 4 threads</text>
+    <text x="340" y="216" fill="#dc2626">barrier + join</text>
+    <text x="390" y="140">serial</text>
+    <text x="545" y="78" font-weight="600" fill="#0f172a">next parallel region</text>
+    <text x="640" y="236" fill="#dc2626">barrier + join</text>
+    <text x="700" y="140">serial</text>
+  </g>
+  <text x="24" y="258" fill="#475569" font-size="12">One master thread runs the serial parts. Each parallel region forks a team (usually reused from a pool, not re-created),</text>
+  <text x="24" y="274" fill="#475569" font-size="12">and every thread waits at the implicit barrier at the end of the region before the master continues alone.</text>
+</svg>

@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 320" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13">
+  <defs>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#dc2626"/>
+    </marker>
+  </defs>
+  <rect width="780" height="320" rx="12" fill="#ffffff"/>
+  <text x="24" y="34" font-size="18" font-weight="600" fill="#0f172a">False sharing: different variables, same 64-byte cache line</text>
+
+  <!-- bad -->
+  <text x="24" y="72" font-weight="600" fill="#dc2626">Packed counters</text>
+  <rect x="200" y="56" width="70" height="30" rx="6" fill="#dbeafe" stroke="#2563eb"/><text x="235" y="76" text-anchor="middle">Core 0</text>
+  <rect x="560" y="56" width="70" height="30" rx="6" fill="#ffedd5" stroke="#ea580c"/><text x="595" y="76" text-anchor="middle">Core 1</text>
+  <rect x="200" y="110" width="430" height="34" fill="#f8fafc" stroke="#475569"/>
+  <rect x="200" y="110" width="54" height="34" fill="#dbeafe" stroke="#2563eb"/><text x="227" y="132" text-anchor="middle" font-size="12">c[0]</text>
+  <rect x="254" y="110" width="54" height="34" fill="#ffedd5" stroke="#ea580c"/><text x="281" y="132" text-anchor="middle" font-size="12">c[1]</text>
+  <text x="470" y="132" text-anchor="middle" font-size="12" fill="#64748b">… rest of the same 64-byte line …</text>
+  <path d="M235,86 L228,108" stroke="#2563eb" stroke-width="1.5"/><path d="M595,86 L285,108" stroke="#ea580c" stroke-width="1.5"/>
+  <path d="M290,160 C360,180 480,180 560,160" stroke="#dc2626" stroke-width="1.6" fill="none" marker-start="url(#ar)" marker-end="url(#ar)"/>
+  <text x="650" y="122" fill="#dc2626" font-size="12">every write</text>
+  <text x="650" y="138" fill="#dc2626" font-size="12">invalidates the</text>
+  <text x="650" y="154" fill="#dc2626" font-size="12">other core's copy</text>
+  <text x="425" y="192" text-anchor="middle" fill="#dc2626" font-size="12">the line ping-pongs between cores</text>
+
+  <line x1="24" y1="210" x2="756" y2="210" stroke="#e2e8f0"/>
+
+  <!-- good -->
+  <text x="24" y="246" font-weight="600" fill="#16a34a">Padded / aligned</text>
+  <rect x="200" y="230" width="210" height="34" fill="#f8fafc" stroke="#475569"/>
+  <rect x="200" y="230" width="54" height="34" fill="#dbeafe" stroke="#2563eb"/><text x="227" y="252" text-anchor="middle" font-size="12">c[0]</text>
+  <text x="330" y="252" text-anchor="middle" font-size="12" fill="#64748b">padding</text>
+  <rect x="420" y="230" width="210" height="34" fill="#f8fafc" stroke="#475569"/>
+  <rect x="420" y="230" width="54" height="34" fill="#ffedd5" stroke="#ea580c"/><text x="447" y="252" text-anchor="middle" font-size="12">c[1]</text>
+  <text x="550" y="252" text-anchor="middle" font-size="12" fill="#64748b">padding</text>
+  <text x="650" y="244" fill="#16a34a" font-size="12">one line per core:</text>
+  <text x="650" y="260" fill="#16a34a" font-size="12">no ping-pong</text>
+  <text x="24" y="296" fill="#475569" font-size="12">Fixes: <tspan font-family="Consolas, monospace">struct alignas(64) Counter {…};</tspan> · accumulate in a local variable and write once · use reduction(+:x) in OpenMP.</text>
+</svg>
