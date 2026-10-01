@@ -228,3 +228,150 @@ private:
 
     run(work_mutex);
     run(work_atomic);
+
+## Asynchronous
+In Lecture 5 a worker thread deposited its answer into `partials[id]` and `main` read it after joining.
+That works, but it is bookkeeping. **`std::async`** does it for you: hand it a callable and it runs the
+callable (potentially on a new thread) and hands back a **`std::future<T>`** — a placeholder for a value
+that will exist later. Call **`.get()`** on the future and it blocks until the task is finished, then
+returns the result.
+
+Two things `std::future` gives you for free that a raw slot does not: **exceptions** thrown inside the
+task are stored and re-thrown when you call `get()`, and the **synchronization** (waiting for completion)
+is built in — no explicit join. Passing **`std::launch::async`** asks for the task to run on its own
+thread right away, rather than possibly being deferred to run lazily inside `get()`.
+- **`std::async`** - create a thread of task and return an output
+- **`std::launch::async`** - ask for the task to run its own thread
+- **`std::future`** - a placeholder of a variable that will exist later
+- **`.get()`** - return the output from the thread
+Compare this to Lecture 5's `parallel_sum`: same answer, but there is no `std::vector<std::thread>`, no
+`join()` loop, and no shared `partials` array. Each `std::async` call returns a `std::future<double>`,
+and summing `f.get()` over the futures both **waits** for every task and **collects** its result in one
+step.
+
+- **`std::launch::async`** forces each task onto its own thread immediately. Without it (the default,
+  `async | deferred`), the implementation is *allowed* to defer the work and run it lazily inside
+  `get()` — on one thread, with no parallelism. When you want real concurrency, ask for it explicitly.
+- **Exceptions travel through the future.** If `partial` threw, the exception would be stored and
+  re-thrown at `f.get()`, so error handling stays where you can see it instead of vanishing on a worker
+  thread.
+- **One caveat to remember:** the future returned by `std::async(std::launch::async, …)` blocks in its
+  *destructor* until the task finishes. Keep the futures (as we do) rather than discarding them, or the
+  "async" call quietly becomes blocking.
+  
+## Condition Threads
+Threads often need to wait for each other (distribution of responsibility)
+A **`std::condition_variable`** lets a thread **sleep** until another thread signals that something
+changed. The consumer calls `cv.wait(lock, predicate)`: it atomically releases the mutex and sleeps, and
+when notified, re-acquires the lock and checks the **predicate**; if the predicate is false it goes back
+to sleep. The producer calls `cv.notify_one()` after changing the shared state to wake a waiter. The
+`wait` uses a **`std::unique_lock`** (not `lock_guard`) because it must unlock and relock the mutex as it
+sleeps and wakes.
+
+
+## Avoiding Deadlock
+**'std::scoped_lock'** -uses a deadlock-avoidance algorithm, so this is safe even though the two threads request the locks in opposite orders. 
+
+# OpenMP Model
+- A fork-join execution model
+- One master thread runs sequentially; each parallel region forks a team of thread, which synchronize at an implicit barrier and join back to the master.
+- Nice and easy to use rather than manually adding/forking/joining threads
+
+## Compile /o -fopenmp and guard API class 
+#ifdef _OPENMP
+  #include <omp.h>
+#else
+  // Serial stubs — same signatures as the runtime, values for a team of one.
+  inline int    omp_get_thread_num()      { return 0; }
+  inline int    omp_get_num_threads()     { return 1; }
+  inline int    omp_get_max_threads()     { return 1; }
+  inline int    omp_get_num_procs()       { return 1; }
+  inline bool   omp_in_parallel()         { return false; }
+  inline void   omp_set_num_threads(int)  {}
+  inline double omp_get_wtime()           { return std::chrono::duration<double>(
+        std::chrono::steady_clock::now().time_since_epoch()).count(); }
+#endif
+
+## Parallel
+- **`#pragma omp parallel for`** - faithfully runs the loop body on many threads — **including** the bugs. If the body updates a shared variable without saying how to combine it, you get the exact data race from Lecture 5, just with less code to write it in.
+- **`reduction(op:var)`** — for combining values into one variable with an operator. Private per-thread
+  copies, no synchronization in the loop, combined at the end. **Fastest and the right default here.**
+- **`#pragma omp critical`** — a general critical section (one thread at a time), for updates too complex
+  for a reduction. Correct, but it **serializes** every iteration and is slow in a hot loop.
+- **`#pragma omp atomic`** — a lighter critical section for a *single* scalar update (`x += …`, `++x`).
+  Cheaper than `critical`, but still contended if every iteration hits it.
+
+## data-sharing clauses
+- **`private(x)`** gives each thread its own *uninitialized* `x`;
+- **`firstprivate(x)`** gives each thread its own copy *initialized* to the value `x` had before the region;
+- **`shared(x)`** keeps one instance (which you must then synchronize if written). 
+- And **`default(none)`** switches off the defaults entirely, so the compiler makes you classify every variable — the best way to
+catch an accidental share.
+
+## Loop Scheduling
+`#pragma omp parallel for` has to decide *which* iterations each thread runs. The **`schedule`** clause
+controls that, and the right choice depends on whether the iterations cost the same:
+
+- **`schedule(static)`** (the usual default) splits the iterations into equal contiguous chunks, one per
+  thread, decided up front. Almost no overhead — and perfect when every iteration costs the same.
+  - Great for number crunching & tasks with same workload
+- **`schedule(dynamic, chunk)`** hands out chunks of `chunk` iterations on demand: a thread that finishes
+  early comes back for more. It balances **uneven** workloads at the cost of some run-time coordination.
+  - Great for when the tasks do not have the same workload
+- **`schedule(guided)`** is like dynamic but starts with large chunks and shrinks them, trading a little
+  balance for less overhead.
+
+## Nested Loops: collapse
+`collapse(N)` collapses N nested loops into independent iterations and shares them across the whole team, so no thread is starved by the small outer bound/loop.
+Use it when:
+- the outer loop alone has **too few iterations** to occupy your threads;
+- the loops are **perfectly nested** — nothing but the inner loop sits between them; and
+- the iterations are **independent** (here each writes its own `a[...]`).
+
+If the inner bound depended on the outer index (a triangular loop) or the loops were not tightly nested,
+`collapse` would not apply, and you would parallelize only the outer loop.
+
+The example runs a loop whose iteration cost **grows with the index** — iteration `i` does `O(i)` work —
+so the later iterations are far heavier. Watch static fall behind.
+
+## Performance Trap: False Sharing
+Modern CPUs move memory between cores in 64-byte **cache lines**, not individual bytes. If two threads on two cores repeatedly write to *different* variables that happen to sit on the **same cache line**, each write forces the other core to reload the whole line. The variables are not logically shared, but the hardware treats the line as contended and bounces it back and forth — hence **false** sharing.
+- Make sure to not modify variables on the same cache line
+
+# Task Parallelism
+## Sections
+When you have a small, known number of **independent but different** pieces of work — not the same operation over an array, but genuinely separate jobs — **`#pragma omp sections`** runs them at the same time. Inside a `sections` block, each **`#pragma omp section`** is one job, handed to some thread in the team. It is the task-parallel cousin of `parallel for`: `for` runs the *same* body over many indices, `sections` runs *different* bodies once each.
+
+`sections` needs you to write out each job in advance. **`#pragma omp task`** removes that limit: it
+packages the following statement as a **unit of work** and drops it into a queue, and any idle thread in
+the team picks it up. Because tasks can create *more* tasks, this is exactly what recursive,
+divide-and-conquer algorithms need — the number of tasks is discovered as the recursion unfolds.
+  - thread opens the socket." It does **not** scale past the number of sections you write: three sections keep at most three threads busy, no matter how many cores you have.
+  - That is the key difference from `parallel for`: `for` is for the *same* work over *many* data elements and scales with the data; `sections` is for a *few* *different* pieces of work. When the number of jobs is large or only known at run time, you want the next construct instead.
+The setup has a standard shape:
+
+
+## Dynamic and Recursive Parallelism
+- Wrap everything in a **`#pragma omp parallel`** region to create the team of threads.
+- Use **`#pragma omp single`** so exactly **one** thread starts the recursion; the others wait in the team,
+  ready to run the tasks it spawns.
+- Inside, each recursive call becomes a `task`; **`#pragma omp taskwait`** waits for a node's child tasks
+  before it combines their results.
+
+## Granualariy (Parallelism doesn't mean better)
+- Sometimes the algorithm itself is slow and has a long O() runtime
+- Parallelism speeds up performance linearly, but the algorithm runtime outpaces the parallelism.
+
+
+## Guide to construct `for`, `sections`, or `task`?
+A quick decision guide for OpenMP's three ways to spread work:
+
+| Construct | Use it for | Scales with |
+|---|---|---|
+| **`parallel for`** | the *same* operation over many data elements (a countable loop or number crunching) | the number of iterations |
+| **`sections`** | a *small, fixed* set of *different* jobs, known in advance (complex) | the number of sections you write |
+| **`task`** | *recursive* or *irregular* work whose size is discovered at run time (complex and uneven size) | the number of tasks created (use a cutoff) |
+
+Most numerical kernels are `parallel for`. Reach for `sections` when you have a couple of distinct jobs to
+overlap, and for `task` when the work is a tree, a graph traversal, or anything whose extent you cannot
+write down as a loop.
