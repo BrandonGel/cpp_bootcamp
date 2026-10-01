@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 330" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13">
+  <defs>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#ea580c"/>
+    </marker>
+  </defs>
+  <rect width="780" height="330" rx="12" fill="#ffffff"/>
+  <text x="24" y="34" font-size="18" font-weight="600" fill="#0f172a">vector::push_back — reallocation happens only when size == capacity</text>
+
+  <!-- case 1 -->
+  <text x="24" y="76" font-weight="600" fill="#0f172a">① spare room</text>
+  <text x="24" y="94" fill="#475569" font-size="12">size 3, capacity 4</text>
+  <g fill="#dbeafe" stroke="#2563eb">
+    <rect x="180" y="62" width="44" height="34"/><rect x="224" y="62" width="44" height="34"/><rect x="268" y="62" width="44" height="34"/>
+  </g>
+  <rect x="312" y="62" width="44" height="34" fill="#bbf7d0" stroke="#16a34a" stroke-width="2"/>
+  <g text-anchor="middle" fill="#0f172a"><text x="202" y="84">A</text><text x="246" y="84">B</text><text x="290" y="84">C</text><text x="334" y="84" font-weight="600">D</text></g>
+  <text x="380" y="84" fill="#16a34a">construct D in place → O(1), nothing moves</text>
+
+  <!-- case 2 -->
+  <text x="24" y="150" font-weight="600" fill="#0f172a">② full</text>
+  <text x="24" y="168" fill="#475569" font-size="12">size 4, capacity 4</text>
+  <text x="172" y="150" text-anchor="end" fill="#64748b" font-size="12">old buffer</text>
+  <g fill="#e2e8f0" stroke="#94a3b8">
+    <rect x="180" y="128" width="44" height="34"/><rect x="224" y="128" width="44" height="34"/><rect x="268" y="128" width="44" height="34"/><rect x="312" y="128" width="44" height="34"/>
+  </g>
+  <g text-anchor="middle" fill="#64748b"><text x="202" y="150">A</text><text x="246" y="150">B</text><text x="290" y="150">C</text><text x="334" y="150">D</text></g>
+  <text x="380" y="150" fill="#dc2626">freed after the move</text>
+
+  <g stroke="#ea580c" stroke-width="1.6" fill="none">
+    <path d="M202,162 L202,212" marker-end="url(#ar)"/><path d="M246,162 L246,212" marker-end="url(#ar)"/>
+    <path d="M290,162 L290,212" marker-end="url(#ar)"/><path d="M334,162 L334,212" marker-end="url(#ar)"/>
+  </g>
+  <text x="352" y="194" fill="#ea580c" font-size="12">move (or copy) every element: O(n)</text>
+
+  <text x="172" y="238" text-anchor="end" fill="#64748b" font-size="12">new buffer</text>
+  <g fill="#dbeafe" stroke="#2563eb">
+    <rect x="180" y="216" width="44" height="34"/><rect x="224" y="216" width="44" height="34"/><rect x="268" y="216" width="44" height="34"/><rect x="312" y="216" width="44" height="34"/>
+  </g>
+  <rect x="356" y="216" width="44" height="34" fill="#bbf7d0" stroke="#16a34a" stroke-width="2"/>
+  <g fill="#ffffff" stroke="#94a3b8" stroke-dasharray="4 3">
+    <rect x="400" y="216" width="44" height="34"/><rect x="444" y="216" width="44" height="34"/><rect x="488" y="216" width="44" height="34"/>
+  </g>
+  <g text-anchor="middle" fill="#0f172a"><text x="202" y="238">A</text><text x="246" y="238">B</text><text x="290" y="238">C</text><text x="334" y="238">D</text><text x="378" y="238" font-weight="600">E</text></g>
+  <text x="548" y="238" fill="#475569" font-size="12">capacity × growth factor</text>
+  <text x="548" y="254" fill="#475569" font-size="12">(GCC/Clang 2×, MSVC 1.5×)</text>
+
+  <rect x="24" y="274" width="732" height="42" rx="8" fill="#f8fafc" stroke="#e2e8f0"/>
+  <text x="40" y="292" fill="#0f172a" font-size="12">Because capacity grows geometrically, push_back is <tspan font-weight="600">amortized O(1)</tspan>. Know the final size? Call <tspan font-family="Consolas, monospace">reserve(n)</tspan> once.</text>
+  <text x="40" y="308" fill="#dc2626" font-size="12">A reallocation invalidates every pointer, reference and iterator into the vector.</text>
+</svg>
